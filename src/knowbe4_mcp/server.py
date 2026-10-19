@@ -48,7 +48,7 @@ INSTRUCTIONS = (
     "- Who clicked: knowbe4_phishing_security_tests_list -> "
     "knowbe4_phishing_security_test_recipients(pst_id).\n"
     "- Training status of a person: knowbe4_training_enrollments_list(user_id).\n"
-    "- Lists page with page (from 1) and per_page (max 500).\n"
+    "- Lists page with page (from 1) and per_page (default 50, max 200).\n"
     "The Reporting API is read-only and limited to about 2,000 calls per day plus "
     "one per licensed user, 4 per second; prefer the summaries over paging "
     "through every record."

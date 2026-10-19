@@ -30,7 +30,7 @@ A request to `/mcp` without the key gets HTTP 401; an unknown region gets HTTP 4
 
 ## Tools
 
-All tools return a JSON string. Lists take `page` (from 1) and `per_page` (max 500) and return
+All tools return a JSON string. Lists take `page` (from 1) and `per_page` (default 50, max 200) and return
 `{count, page, has_more, next_page}`.
 
 | Area | Tools |

@@ -17,6 +17,7 @@ import asyncio
 import json
 
 import pytest
+from mcp.server.fastmcp.exceptions import ToolError
 
 from knowbe4_mcp.api_client import KnowBe4Error
 from knowbe4_mcp.server import INSTRUCTIONS, create_mcp_server
@@ -94,7 +95,12 @@ def test_every_tool_is_read_only(tools, name):
 
 
 def test_per_page_is_capped(tools):
-    assert tools["knowbe4_users_list"].inputSchema["properties"]["per_page"]["anyOf"][0]["maximum"] == 500
+    paged = [t for t in tools.values() if "per_page" in t.inputSchema["properties"]]
+    assert len(paged) == 16
+    for tool in paged:
+        assert tool.inputSchema["properties"]["per_page"]["anyOf"][0]["maximum"] == 200, tool.name
+    with pytest.raises(ToolError, match="less than or equal to 200"):
+        asyncio.run(create_mcp_server().call_tool("knowbe4_users_list", {"per_page": 201}))
 
 
 def test_navigate_lists_every_tool():

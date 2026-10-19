@@ -101,7 +101,7 @@ async def test_users_list_filters_and_paging(monkeypatch):
 async def test_short_page_is_the_last(monkeypatch):
     rec = Recorder({"groups": [{"id": 1}]})
     result = await _call(monkeypatch, rec, "knowbe4_groups_list", {})
-    assert rec.requests[0].url.params["per_page"] == "100"
+    assert rec.requests[0].url.params["per_page"] == "50"
     assert result == {"groups": [{"id": 1}], "count": 1, "page": 1, "has_more": False}
 
 
@@ -156,7 +156,7 @@ async def test_enrollment_filters(monkeypatch):
 
 
 async def test_phishing_summary_reads_every_page(monkeypatch):
-    first = [{"delivered_count": 10, "opened_count": 4, "clicked_count": 2, "reported_count": 1, "phish_prone_percentage": 20.0}] * 500
+    first = [{"delivered_count": 10, "opened_count": 4, "clicked_count": 2, "reported_count": 1, "phish_prone_percentage": 20.0}] * 200
     second = [{"delivered_count": 10, "opened_count": 0, "clicked_count": 0, "reported_count": 5, "phish_prone_percentage": 0}]
 
     def tests(request):
@@ -164,9 +164,9 @@ async def test_phishing_summary_reads_every_page(monkeypatch):
 
     rec = Recorder({"phishing/security_tests": tests})
     result = await _call(monkeypatch, rec, "knowbe4_reporting_phishing_summary", {})
-    assert len(rec.requests) == 2 and result["scope"] == "all" and result["security_tests"] == 501
-    assert (result["total_delivered"], result["total_clicked"], result["total_reported"]) == (5010, 1000, 505)
-    assert result["click_rate"] == round(1000 / 5010 * 100, 2)
+    assert len(rec.requests) == 2 and result["scope"] == "all" and result["security_tests"] == 201
+    assert (result["total_delivered"], result["total_clicked"], result["total_reported"]) == (2010, 400, 205)
+    assert result["click_rate"] == round(400 / 2010 * 100, 2)
 
 
 async def test_phishing_summary_one_page(monkeypatch):

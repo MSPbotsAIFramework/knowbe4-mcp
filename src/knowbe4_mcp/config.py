@@ -24,8 +24,8 @@ REGION_BASE_URLS = {
     "de": "https://de.api.knowbe4.com",
 }
 DEFAULT_REGION = "us"
-DEFAULT_PAGE_SIZE = 100
-MAX_PAGE_SIZE = 500
+DEFAULT_PAGE_SIZE = 50
+MAX_PAGE_SIZE = 200
 
 
 class Settings(BaseSettings):
