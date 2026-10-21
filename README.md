@@ -26,7 +26,7 @@ Event API keys are different and do not work here). The region is the server the
 How the key is sent: every call goes to `https://{region}.api.knowbe4.com/v1/...` with
 `Authorization: Bearer <key>`.
 
-A request to `/mcp` without the key gets HTTP 401; an unknown region gets HTTP 400.
+A request to `/mcp` without the key gets HTTP 401; an unknown region does not block the request, and tools return `invalid_argument` instead.
 
 ## Tools
 

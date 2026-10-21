@@ -88,7 +88,11 @@ def _error(scope: Scope, receive: Receive, send: Send, status: int, error: str, 
 
 
 class GatewayCredentialsMiddleware:
-    """Reads the KnowBe4 key and region on /mcp requests into the request context."""
+    """Reads the KnowBe4 key and region on /mcp requests into the request context.
+
+    Missing key -> 401. A malformed region does not block the request (tools/list
+    must work with any values); tools report it instead.
+    """
 
     def __init__(self, app: ASGIApp):
         self.app = app
@@ -104,12 +108,13 @@ class GatewayCredentialsMiddleware:
             await _error(scope, receive, send, 401, "Missing credentials", f"Missing header(s): {HEADER_API_KEY}")
             return
         region = normalize_region(_clean(request.headers.get(HEADER_REGION)))
+        header_error = None
         if region is None:
-            await _error(scope, receive, send, 400, "Invalid credentials", f"{HEADER_REGION} must be one of: {', '.join(REGION_BASE_URLS)}")
-            return
+            header_error = f"{HEADER_REGION} must be one of: {', '.join(REGION_BASE_URLS)}"
+            region = DEFAULT_REGION
 
         request_id = (request.headers.get("x-request-id") or "").strip()[:64] or uuid.uuid4().hex[:12]
-        creds_token = _credentials_var.set(KnowBe4Credentials(api_key, region))
+        creds_token = _credentials_var.set(KnowBe4Credentials(api_key, region, header_error))
         rid_token = request_id_var.set(request_id)
         try:
             await self.app(scope, receive, send)
