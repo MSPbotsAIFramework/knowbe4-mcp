@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from ..api_client import KnowBe4Client
-from ._common import CampaignType, ClientFactory, Page, PerPage, READ_ONLY, compact, list_page, run_tool
+from ._common import CampaignType, ClientFactory, Offset, Page, PerPage, READ_ONLY, compact, list_page, run_tool
 
 
 def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
@@ -27,11 +27,12 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
     async def knowbe4_phishing_campaigns_list(
         page: Page = None,
         per_page: PerPage = None,
+        offset: Offset = None,
     ) -> str:
         """List phishing campaigns: name, groups, status, frequency, phish-prone %, last and next run."""
 
         async def action(client: KnowBe4Client) -> dict:
-            return await list_page(client, "v1/phishing/campaigns", "campaigns", {}, page, per_page)
+            return await list_page(client, "v1/phishing/campaigns", "campaigns", {}, page, per_page, offset)
 
         return await run_tool("knowbe4_phishing_campaigns_list", client_factory, action)
 
@@ -52,11 +53,12 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         campaign_type: CampaignType = None,
         page: Page = None,
         per_page: PerPage = None,
+        offset: Offset = None,
     ) -> str:
         """List phishing security tests (PSTs): name, status, dates, delivered / opened / clicked / reported."""
 
         async def action(client: KnowBe4Client) -> dict:
-            return await list_page(client, "v1/phishing/security_tests", "security_tests", {"campaign_type": campaign_type}, page, per_page)
+            return await list_page(client, "v1/phishing/security_tests", "security_tests", {"campaign_type": campaign_type}, page, per_page, offset)
 
         return await run_tool("knowbe4_phishing_security_tests_list", client_factory, action)
 
@@ -66,11 +68,12 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         campaign_type: CampaignType = None,
         page: Page = None,
         per_page: PerPage = None,
+        offset: Offset = None,
     ) -> str:
         """List the security tests (PSTs) of one phishing campaign with their result counts."""
 
         async def action(client: KnowBe4Client) -> dict:
-            return await list_page(client, f"v1/phishing/campaigns/{campaign_id}/security_tests", "security_tests", {"campaign_type": campaign_type}, page, per_page)
+            return await list_page(client, f"v1/phishing/campaigns/{campaign_id}/security_tests", "security_tests", {"campaign_type": campaign_type}, page, per_page, offset)
 
         return await run_tool("knowbe4_phishing_campaign_tests", client_factory, action)
 
@@ -92,11 +95,12 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         campaign_type: CampaignType = None,
         page: Page = None,
         per_page: PerPage = None,
+        offset: Offset = None,
     ) -> str:
         """List a security test's recipients and what each did (delivered, opened, clicked, reported)."""
 
         async def action(client: KnowBe4Client) -> dict:
-            return await list_page(client, f"v1/phishing/security_tests/{pst_id}/recipients", "recipients", {"campaign_type": campaign_type}, page, per_page)
+            return await list_page(client, f"v1/phishing/security_tests/{pst_id}/recipients", "recipients", {"campaign_type": campaign_type}, page, per_page, offset)
 
         return await run_tool("knowbe4_phishing_security_test_recipients", client_factory, action)
 

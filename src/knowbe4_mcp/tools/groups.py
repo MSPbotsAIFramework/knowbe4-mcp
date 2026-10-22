@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from ..api_client import KnowBe4Client
-from ._common import ClientFactory, FullHistory, GroupStatus, Page, PerPage, READ_ONLY, list_page, run_tool
+from ._common import ClientFactory, FullHistory, GroupStatus, Offset, Page, PerPage, READ_ONLY, list_page, run_tool
 
 
 def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
@@ -28,11 +28,12 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         status: GroupStatus = None,
         page: Page = None,
         per_page: PerPage = None,
+        offset: Offset = None,
     ) -> str:
         """List groups: name, type (console / smart / AD), member count, status, current risk score."""
 
         async def action(client: KnowBe4Client) -> dict:
-            return await list_page(client, "v1/groups", "groups", {"status": status}, page, per_page)
+            return await list_page(client, "v1/groups", "groups", {"status": status}, page, per_page, offset)
 
         return await run_tool("knowbe4_groups_list", client_factory, action)
 
@@ -52,11 +53,12 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         group_id: Annotated[int, Field(description="Group id.", ge=1)],
         page: Page = None,
         per_page: PerPage = None,
+        offset: Offset = None,
     ) -> str:
         """List the users in a group."""
 
         async def action(client: KnowBe4Client) -> dict:
-            return await list_page(client, f"v1/groups/{group_id}/members", "members", {}, page, per_page)
+            return await list_page(client, f"v1/groups/{group_id}/members", "members", {}, page, per_page, offset)
 
         return await run_tool("knowbe4_groups_members", client_factory, action)
 
@@ -66,10 +68,11 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         full: FullHistory = None,
         page: Page = None,
         per_page: PerPage = None,
+        offset: Offset = None,
     ) -> str:
         """Get one group's risk score history (date and score)."""
 
         async def action(client: KnowBe4Client) -> dict:
-            return await list_page(client, f"v1/groups/{group_id}/risk_score_history", "history", {"full": full}, page, per_page)
+            return await list_page(client, f"v1/groups/{group_id}/risk_score_history", "history", {"full": full}, page, per_page, offset)
 
         return await run_tool("knowbe4_groups_risk_score_history", client_factory, action)

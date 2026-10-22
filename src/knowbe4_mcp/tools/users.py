@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from ..api_client import KnowBe4Client
-from ._common import ClientFactory, ExpandGroups, FullHistory, GroupFilter, Page, PerPage, READ_ONLY, UserStatus, list_page, run_tool
+from ._common import ClientFactory, ExpandGroups, FullHistory, GroupFilter, Offset, Page, PerPage, READ_ONLY, UserStatus, list_page, run_tool
 
 
 def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
@@ -30,11 +30,12 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         expand_groups: ExpandGroups = None,
         page: Page = None,
         per_page: PerPage = None,
+        offset: Offset = None,
     ) -> str:
         """List users: name, email, department, manager, status, phish-prone %, risk score, groups."""
 
         async def action(client: KnowBe4Client) -> dict:
-            return await list_page(client, "v1/users", "users", {"status": status, "group_id": group_id, "expand": "group" if expand_groups else None}, page, per_page)
+            return await list_page(client, "v1/users", "users", {"status": status, "group_id": group_id, "expand": "group" if expand_groups else None}, page, per_page, offset)
 
         return await run_tool("knowbe4_users_list", client_factory, action)
 
@@ -55,10 +56,11 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         full: FullHistory = None,
         page: Page = None,
         per_page: PerPage = None,
+        offset: Offset = None,
     ) -> str:
         """Get one user's risk score history (date and score)."""
 
         async def action(client: KnowBe4Client) -> dict:
-            return await list_page(client, f"v1/users/{user_id}/risk_score_history", "history", {"full": full}, page, per_page)
+            return await list_page(client, f"v1/users/{user_id}/risk_score_history", "history", {"full": full}, page, per_page, offset)
 
         return await run_tool("knowbe4_users_risk_score_history", client_factory, action)

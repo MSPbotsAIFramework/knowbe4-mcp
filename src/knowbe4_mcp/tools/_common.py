@@ -36,6 +36,10 @@ NOT_CONFIGURED = error_envelope("not_configured", "KnowBe4 credentials are missi
 
 Page = Annotated[int | None, Field(description="Page number, starting at 1.", ge=1)]
 PerPage = Annotated[int | None, Field(description=f"Records per page (default {DEFAULT_PAGE_SIZE}, max {MAX_PAGE_SIZE}).", ge=1, le=MAX_PAGE_SIZE)]
+Offset = Annotated[
+    int | None,
+    Field(description="Record position to start from (0-based, overrides page); pass next_offset from the previous result.", ge=0),
+]
 UserStatus = Annotated[Literal["active", "archived"] | None, Field(description="Only active or archived users.")]
 GroupStatus = Annotated[Literal["active", "archived"] | None, Field(description="Only active or archived groups.")]
 GroupFilter = Annotated[int | None, Field(description="Only users in this group id.", ge=1)]
@@ -50,13 +54,48 @@ def compact(values: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in values.items() if v is not None and v != ""}
 
 
-async def list_page(client: KnowBe4Client, path: str, key: str, params: dict[str, Any], page: int | None, per_page: int | None) -> dict:
-    """GET a list (a JSON array) and add paging hints: a full page means there may be more."""
-    number, size = page or 1, per_page or DEFAULT_PAGE_SIZE
+def locate(offset: int | None, page: int | None, per_page: int | None) -> tuple[int, int, int]:
+    """(page, per_page, start) for a read from record ``start``.
+
+    KnowBe4 pages by number only, so a position is reached by asking for the page that
+    holds it (same page size) and skipping the records before it.
+    """
+    size = per_page or DEFAULT_PAGE_SIZE
+    start = offset if offset is not None else ((page or 1) - 1) * size
+    return start // size + 1, size, start
+
+
+async def list_page(
+    client: KnowBe4Client,
+    path: str,
+    key: str,
+    params: dict[str, Any],
+    page: int | None,
+    per_page: int | None,
+    offset: int | None = None,
+) -> dict:
+    """GET a list (a JSON array) from record ``start`` and add paging hints: a full page means there may be more.
+
+    next_offset continues right after the last record returned, also when the result is cut
+    to fit the size limit (a page number cannot: the rest of a cut page is on no other page).
+    """
+    number, size, start = locate(offset, page, per_page)
     payload = await client.get(path, compact(params) | {"page": number, "per_page": size})
     rows = payload if isinstance(payload, list) else (payload.get(key) if isinstance(payload, dict) else None) or []
     full = len(rows) >= size
-    return compact({key: rows, "count": len(rows), "page": number, "has_more": full, "next_page": number + 1 if full else None})
+    rows = rows[start - (number - 1) * size :]
+    return compact(
+        {
+            key: rows,
+            "count": len(rows),
+            "page": number,
+            "has_more": full,
+            "next_page": number + 1 if full else None,
+            "offset": start,
+            "next_offset": start + len(rows) if full else None,
+            "_resume": {"key": "next_offset", "start": start},
+        }
+    )
 
 
 async def all_rows(client: KnowBe4Client, path: str, limit: int = 2000) -> list:

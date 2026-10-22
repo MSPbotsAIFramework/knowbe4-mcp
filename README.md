@@ -31,7 +31,10 @@ A request to `/mcp` without the key gets HTTP 401; an unknown region does not bl
 ## Tools
 
 All tools return a JSON string. Lists take `page` (from 1) and `per_page` (default 50, max 200) and return
-`{count, page, has_more, next_page}`.
+`{count, page, has_more, next_page, offset, next_offset}`. They also take `offset` (record position from 0,
+overrides `page`): pass `next_offset` from the previous result to continue. When a page is too large for one
+response and is cut, `next_offset` starts right after the last record returned, so no record is skipped
+(KnowBe4 pages by number only, and the rest of a cut page is on no other page).
 
 | Area | Tools |
 |---|---|

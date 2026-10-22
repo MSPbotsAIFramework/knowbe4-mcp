@@ -102,7 +102,7 @@ async def test_short_page_is_the_last(monkeypatch):
     rec = Recorder({"groups": [{"id": 1}]})
     result = await _call(monkeypatch, rec, "knowbe4_groups_list", {})
     assert rec.requests[0].url.params["per_page"] == "50"
-    assert result == {"groups": [{"id": 1}], "count": 1, "page": 1, "has_more": False}
+    assert result == {"groups": [{"id": 1}], "count": 1, "page": 1, "has_more": False, "offset": 0}
 
 
 @pytest.mark.parametrize(
@@ -207,3 +207,108 @@ async def test_non_json_error_body():
     with pytest.raises(KnowBe4Error) as e:
         await _client(rec).get("v1/users")
     assert "per_page must be at most 500" in e.value.message
+
+
+# --- Page-number paging that survives truncation -------------------------------------------
+
+# (tool, required args, path, list key) for every tool that pages by number.
+PAGED = [
+    ("knowbe4_account_risk_score_history", {}, "account/risk_score_history", "history"),
+    ("knowbe4_users_list", {}, "users", "users"),
+    ("knowbe4_users_risk_score_history", {"user_id": 5}, "users/5/risk_score_history", "history"),
+    ("knowbe4_groups_list", {}, "groups", "groups"),
+    ("knowbe4_groups_members", {"group_id": 4}, "groups/4/members", "members"),
+    ("knowbe4_groups_risk_score_history", {"group_id": 4}, "groups/4/risk_score_history", "history"),
+    ("knowbe4_phishing_campaigns_list", {}, "phishing/campaigns", "campaigns"),
+    ("knowbe4_phishing_security_tests_list", {}, "phishing/security_tests", "security_tests"),
+    ("knowbe4_phishing_campaign_tests", {"campaign_id": 7}, "phishing/campaigns/7/security_tests", "security_tests"),
+    ("knowbe4_phishing_security_test_recipients", {"pst_id": 8}, "phishing/security_tests/8/recipients", "recipients"),
+    ("knowbe4_training_campaigns_list", {}, "training/campaigns", "campaigns"),
+    ("knowbe4_training_enrollments_list", {}, "training/enrollments", "enrollments"),
+    ("knowbe4_store_purchases_list", {}, "training/store_purchases", "store_purchases"),
+    ("knowbe4_policies_list", {}, "training/policies", "policies"),
+]
+TOTAL = 47
+
+
+def _record(i: int, big: bool) -> dict:
+    # Many short fields: shortening long values cannot make a big page fit, so it gets cut.
+    return {"id": i} | ({f"f{k}": f"{i}-{k}-" + "x" * 60 for k in range(40)} if big else {})
+
+
+def _paged(path: str, big: bool = True) -> Recorder:
+    """A fake API that pages by page number + per_page like KnowBe4 (JSON array replies)."""
+    data = [_record(i, big) for i in range(TOTAL)]
+
+    def reply(request: httpx.Request) -> httpx.Response:
+        page, size = int(request.url.params["page"]), int(request.url.params["per_page"])
+        return httpx.Response(200, json=data[(page - 1) * size : page * size])
+
+    return Recorder({path: reply})
+
+
+async def _walk(monkeypatch, rec, tool, args, key, first: dict) -> list[int]:
+    ids: list[int] = []
+    result = await _call(monkeypatch, rec, tool, args | first)
+    for _ in range(100):
+        assert "retry_page_size" not in result
+        ids += [r["id"] for r in result[key]]
+        if result.get("next_offset") is None:
+            return ids
+        result = await _call(monkeypatch, rec, tool, args | {"per_page": 10, "offset": result["next_offset"]})
+    raise AssertionError("did not finish")
+
+
+@pytest.mark.parametrize("tool,args,path,key", PAGED)
+async def test_cut_pages_walked_by_next_offset_return_every_record_once(monkeypatch, tool, args, path, key):
+    rec = _paged(path)
+    first = await _call(monkeypatch, rec, tool, args | {"per_page": 10})
+    assert first["truncated"] is True and first["count"] < 10 and "retry_page_size" not in first
+    ids = await _walk(monkeypatch, rec, tool, args, key, {"per_page": 10})
+    assert ids == list(range(TOTAL))
+
+
+@pytest.mark.parametrize("tool,args,path,key", PAGED)
+async def test_cut_pages_from_a_later_page(monkeypatch, tool, args, path, key):
+    ids = await _walk(monkeypatch, _paged(path), tool, args, key, {"page": 3, "per_page": 10})
+    assert ids == list(range(20, TOTAL))
+
+
+@pytest.mark.parametrize("tool,args,path,key", PAGED)
+@pytest.mark.parametrize("offset,page,first_id", [(13, "2", 13), (20, "3", 20), (0, "1", 0)])
+async def test_offset_reads_the_page_that_holds_it(monkeypatch, tool, args, path, key, offset, page, first_id):
+    rec = _paged(path, big=False)
+    result = await _call(monkeypatch, rec, tool, args | {"per_page": 10, "offset": offset})
+    assert (rec.requests[0].url.params["page"], rec.requests[0].url.params["per_page"]) == (page, "10")
+    assert [r["id"] for r in result[key]] == list(range(first_id, int(page) * 10))
+    assert (result["offset"], result["next_offset"], result["has_more"]) == (offset, int(page) * 10, True)
+
+
+@pytest.mark.parametrize("tool,args,path,key", PAGED)
+async def test_offset_past_the_end(monkeypatch, tool, args, path, key):
+    result = await _call(monkeypatch, _paged(path, big=False), tool, args | {"per_page": 10, "offset": 500})
+    assert result[key] == [] and result["has_more"] is False and "next_offset" not in result
+
+
+@pytest.mark.parametrize("tool,args,path,key", PAGED)
+async def test_offset_wins_over_page(monkeypatch, tool, args, path, key):
+    rec = _paged(path, big=False)
+    result = await _call(monkeypatch, rec, tool, args | {"page": 4, "per_page": 10, "offset": 5})
+    assert rec.requests[0].url.params["page"] == "1" and [r["id"] for r in result[key]] == list(range(5, 10))
+
+
+@pytest.mark.parametrize("tool,args,path,key", PAGED)
+async def test_offset_with_default_page_size(monkeypatch, tool, args, path, key):
+    rec = _paged(path, big=False)
+    result = await _call(monkeypatch, rec, tool, args | {"offset": 3})
+    assert (rec.requests[0].url.params["page"], rec.requests[0].url.params["per_page"]) == ("1", "50")
+    assert [r["id"] for r in result[key]] == list(range(3, TOTAL)) and result["has_more"] is False
+
+
+@pytest.mark.parametrize("tool,args,path,key", PAGED)
+async def test_page_only_call_is_unchanged(monkeypatch, tool, args, path, key):
+    rec = _paged(path, big=False)
+    result = await _call(monkeypatch, rec, tool, args | {"page": 2, "per_page": 10})
+    assert len(rec.requests) == 1 and dict(rec.requests[0].url.params) == {"page": "2", "per_page": "10"}
+    assert [r["id"] for r in result[key]] == list(range(10, 20))
+    assert (result["count"], result["page"], result["has_more"], result["next_page"]) == (10, 2, True, 3)

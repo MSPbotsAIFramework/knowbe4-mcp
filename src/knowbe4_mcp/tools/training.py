@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from ..api_client import KnowBe4Client
-from ._common import ClientFactory, ExcludeArchived, OptionalId, Page, PerPage, READ_ONLY, list_page, run_tool
+from ._common import ClientFactory, ExcludeArchived, OptionalId, Offset, Page, PerPage, READ_ONLY, list_page, run_tool
 
 
 def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
@@ -27,11 +27,12 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
     async def knowbe4_training_campaigns_list(
         page: Page = None,
         per_page: PerPage = None,
+        offset: Offset = None,
     ) -> str:
         """List training campaigns: name, groups, modules, status, completion %, start and end dates."""
 
         async def action(client: KnowBe4Client) -> dict:
-            return await list_page(client, "v1/training/campaigns", "campaigns", {}, page, per_page)
+            return await list_page(client, "v1/training/campaigns", "campaigns", {}, page, per_page, offset)
 
         return await run_tool("knowbe4_training_campaigns_list", client_factory, action)
 
@@ -54,11 +55,12 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         exclude_archived_users: ExcludeArchived = None,
         page: Page = None,
         per_page: PerPage = None,
+        offset: Offset = None,
     ) -> str:
         """List training enrollments: user, module, campaign, status, enrollment / start / completion dates."""
 
         async def action(client: KnowBe4Client) -> dict:
-            return await list_page(client, "v1/training/enrollments", "enrollments", {"campaign_id": campaign_id, "user_id": user_id, "store_purchase_id": store_purchase_id, "exclude_archived_users": exclude_archived_users}, page, per_page)
+            return await list_page(client, "v1/training/enrollments", "enrollments", {"campaign_id": campaign_id, "user_id": user_id, "store_purchase_id": store_purchase_id, "exclude_archived_users": exclude_archived_users}, page, per_page, offset)
 
         return await run_tool("knowbe4_training_enrollments_list", client_factory, action)
 
@@ -77,11 +79,12 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
     async def knowbe4_store_purchases_list(
         page: Page = None,
         per_page: PerPage = None,
+        offset: Offset = None,
     ) -> str:
         """List purchased training content: name, type, duration, publisher, purchase date."""
 
         async def action(client: KnowBe4Client) -> dict:
-            return await list_page(client, "v1/training/store_purchases", "store_purchases", {}, page, per_page)
+            return await list_page(client, "v1/training/store_purchases", "store_purchases", {}, page, per_page, offset)
 
         return await run_tool("knowbe4_store_purchases_list", client_factory, action)
 
@@ -100,11 +103,12 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
     async def knowbe4_policies_list(
         page: Page = None,
         per_page: PerPage = None,
+        offset: Offset = None,
     ) -> str:
         """List uploaded policies (documents users must acknowledge): name, status, minimum time."""
 
         async def action(client: KnowBe4Client) -> dict:
-            return await list_page(client, "v1/training/policies", "policies", {}, page, per_page)
+            return await list_page(client, "v1/training/policies", "policies", {}, page, per_page, offset)
 
         return await run_tool("knowbe4_policies_list", client_factory, action)
 
